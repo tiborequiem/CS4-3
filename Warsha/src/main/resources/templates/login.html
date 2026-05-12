@@ -60,7 +60,16 @@
     .footer-link { text-align: center; margin-top: 1.2rem; font-size: .85rem; color: #5a6a7a; }
     .footer-link a { color: #1a56a4; text-decoration: none; font-weight: 500; }
     .footer-link a:hover { text-decoration: underline; }
+    .divider { border: none; border-top: 1px solid #e8eef4; margin: 1.2rem 0; }
+    .worker-link {
+      display: block; width: 100%; text-align: center; padding: .65rem;
+      background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 3px;
+      color: #1a56a4; text-decoration: none; font-size: .9rem; font-weight: 500;
+      transition: background .15s;
+    }
+    .worker-link:hover { background: #dbeafe; }
   </style>
+  <base target="_self">
 </head>
 <body>
 <div class="header">
@@ -92,7 +101,10 @@
     <button class="btn" type="submit">Sign in</button>
   </form>
 
+  <hr class="divider"/>
+
   <p class="footer-link">New to Warsha? <a th:href="@{/register}">Create an account</a></p>
+  <a class="worker-link" th:href="@{/register/worker}">Join as a Worker →</a>
 </div>
 </body>
 </html>

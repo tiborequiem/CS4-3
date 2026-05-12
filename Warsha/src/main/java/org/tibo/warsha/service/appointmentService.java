@@ -3,24 +3,32 @@ package org.tibo.warsha.service;
 import org.tibo.warsha.model.Appointment;
 import org.tibo.warsha.model.User;
 import org.tibo.warsha.repository.AppointmentRepository;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+// Manages the full lifecycle of appointments: booking, confirming, completing, and cancelling
 @Service
 public class AppointmentService {
 
     private final AppointmentRepository appointmentRepository;
     private final UserService userService;
+    private final PaymentService paymentService;
 
-    public AppointmentService(AppointmentRepository appointmentRepository, UserService userService) {
+    // @Lazy on PaymentService breaks the circular dependency between these two services
+    public AppointmentService(AppointmentRepository appointmentRepository,
+                              UserService userService,
+                              @Lazy PaymentService paymentService) {
         this.appointmentRepository = appointmentRepository;
-        this.userService = userService;
+        this.userService           = userService;
+        this.paymentService        = paymentService;
     }
 
+    // Creates a new appointment after validating the time, users, and roles
     @Transactional
     public Appointment bookAppointment(Long customerId, Long workerId, String serviceType,
                                        LocalDateTime appointmentDate, String notes) {
@@ -52,21 +60,7 @@ public class AppointmentService {
         return appointmentRepository.save(appointment);
     }
 
-    @Transactional(readOnly = true)
-    public List<Appointment> findByCustomer(User customer) {
-        return appointmentRepository.findByCustomerOrderByAppointmentDateDesc(customer);
-    }
-
-    @Transactional(readOnly = true)
-    public List<Appointment> findByWorker(User worker) {
-        return appointmentRepository.findByWorkerOrderByAppointmentDateDesc(worker);
-    }
-
-    @Transactional(readOnly = true)
-    public Optional<Appointment> findById(Long id) {
-        return appointmentRepository.findById(id);
-    }
-
+    // Either participant (customer or worker) can cancel, but not after completion
     @Transactional
     public void cancelAppointment(Long appointmentId, Long userId) {
         Appointment appointment = appointmentRepository.findById(appointmentId)
@@ -85,6 +79,7 @@ public class AppointmentService {
         appointmentRepository.save(appointment);
     }
 
+    // Only the assigned worker can move a PENDING appointment to CONFIRMED
     @Transactional
     public void confirmAppointment(Long appointmentId, Long workerId) {
         Appointment appointment = appointmentRepository.findById(appointmentId)
@@ -102,6 +97,7 @@ public class AppointmentService {
         appointmentRepository.save(appointment);
     }
 
+    // Marks a CONFIRMED appointment as COMPLETED and triggers automatic payment creation
     @Transactional
     public void completeAppointment(Long appointmentId, Long workerId) {
         Appointment appointment = appointmentRepository.findById(appointmentId)
@@ -116,6 +112,54 @@ public class AppointmentService {
         }
 
         appointment.setStatus(Appointment.Status.COMPLETED);
-        appointmentRepository.save(appointment);
+        Appointment saved = appointmentRepository.save(appointment);
+
+        // Create the payment record now that the appointment is complete
+        paymentService.processAutomaticPayment(saved);
+    }
+
+    // Worker rejection re-uses the cancel logic
+    @Transactional
+    public void rejectAppointment(Long appointmentId, Long workerId) {
+        cancelAppointment(appointmentId, workerId);
+    }
+
+    // Returns all appointments for a customer, sorted newest first
+    @Transactional(readOnly = true)
+    public List<Appointment> findByCustomer(User customer) {
+        return appointmentRepository.findByCustomerOrderByAppointmentDateDesc(customer);
+    }
+
+    // Returns all appointments assigned to a worker, sorted newest first
+    @Transactional(readOnly = true)
+    public List<Appointment> findByWorker(User worker) {
+        return appointmentRepository.findByWorkerOrderByAppointmentDateDesc(worker);
+    }
+
+    // Looks up a single appointment by ID
+    @Transactional(readOnly = true)
+    public Optional<Appointment> findById(Long id) {
+        return appointmentRepository.findById(id);
+    }
+
+    // Returns only COMPLETED appointments for a worker — used on the earnings page
+    @Transactional(readOnly = true)
+    public List<Appointment> getCompletedAppointments(User worker) {
+        return appointmentRepository.findByWorkerAndStatus(worker, Appointment.Status.COMPLETED);
+    }
+
+    // Returns the count of PENDING requests — used for the dashboard notification badge
+    @Transactional(readOnly = true)
+    public long getPendingRequestsCount(User worker) {
+        return appointmentRepository.countByWorkerAndStatus(worker, Appointment.Status.PENDING);
+    }
+
+    // Filters all worker appointments down to those scheduled for today
+    @Transactional(readOnly = true)
+    public List<Appointment> getTodaysAppointments(User worker) {
+        LocalDate today = LocalDate.now();
+        return findByWorker(worker).stream()
+                .filter(a -> a.getAppointmentDate().toLocalDate().equals(today))
+                .toList();
     }
 }

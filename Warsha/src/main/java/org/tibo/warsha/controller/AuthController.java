@@ -1,5 +1,7 @@
 package org.tibo.warsha.controller;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.tibo.warsha.service.UserService;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -14,12 +16,17 @@ public class AuthController {
         this.userService = userService;
     }
 
-    // ── Root ──────────────────────────────────────────────────────────────────
 
     @GetMapping("/")
-    public String root() { return "redirect:/profile"; }
+    public String root(@AuthenticationPrincipal UserDetails principal) {
+        if (principal == null) {
+            return "redirect:/login";
+        }
+        boolean isWorker = principal.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_WORKER"));
+        return isWorker ? "redirect:/worker/dashboard" : "redirect:/layout";
+    }
 
-    // ── Login ─────────────────────────────────────────────────────────────────
 
     @GetMapping("/login")
     public String showLogin(@RequestParam(required = false) String error,
@@ -32,7 +39,6 @@ public class AuthController {
         return "login";
     }
 
-    // ── Register (regular user) ───────────────────────────────────────────────
 
     @GetMapping("/register")
     public String showRegister() { return "register"; }
@@ -60,7 +66,6 @@ public class AuthController {
         }
     }
 
-    // ── Register (worker) ─────────────────────────────────────────────────────
 
     @GetMapping("/register/worker")
     public String showWorkerRegister() { return "register-worker"; }

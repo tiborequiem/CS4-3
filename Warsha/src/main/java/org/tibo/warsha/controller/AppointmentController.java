@@ -27,7 +27,7 @@ public class AppointmentController {
         this.userService = userService;
     }
 
-    // ── Customer Dashboard ────────────────────────────────────────────────────
+    // ── Customer Appointments ─────────────────────────────────────────────────
 
     @GetMapping
     public String customerDashboard(@AuthenticationPrincipal UserDetails principal, Model model) {
@@ -36,10 +36,10 @@ public class AppointmentController {
         List<Appointment> appointments = appointmentService.findByCustomer(customer);
         model.addAttribute("appointments", appointments);
         model.addAttribute("user", customer);
-        return "appointments";
+        return "customer-appointments";
     }
 
-    // ── Worker Dashboard (same view, different data) ────────────────────────
+    // ── Worker Appointments ───────────────────────────────────────────────────
 
     @GetMapping("/worker")
     public String workerDashboard(@AuthenticationPrincipal UserDetails principal, Model model) {
@@ -48,8 +48,7 @@ public class AppointmentController {
         List<Appointment> appointments = appointmentService.findByWorker(worker);
         model.addAttribute("appointments", appointments);
         model.addAttribute("user", worker);
-        model.addAttribute("isWorkerView", true);
-        return "appointments";
+        return "worker/appointments";
     }
 
     // ── Booking Form ──────────────────────────────────────────────────────────
@@ -61,7 +60,10 @@ public class AppointmentController {
         User worker = userService.findById(workerId)
                 .filter(u -> u.getRole() == User.Role.WORKER)
                 .orElseThrow(() -> new IllegalArgumentException("Worker not found."));
+        User customer = userService.findByUsername(principal.getUsername())
+                .orElseThrow(() -> new IllegalStateException("User not found"));
         model.addAttribute("worker", worker);
+        model.addAttribute("user", customer);
         model.addAttribute("minDate", LocalDateTime.now().plusHours(2));
         return "book-appointment";
     }
@@ -136,6 +138,7 @@ public class AppointmentController {
         } catch (IllegalArgumentException e) {
             ra.addFlashAttribute("error", e.getMessage());
         }
+
         return "redirect:/appointments/worker";
     }
 }

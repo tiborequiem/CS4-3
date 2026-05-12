@@ -26,7 +26,15 @@
       font-size: 1.15rem; font-weight: 600; color: #fff; text-decoration: none;
     }
     .nav-logo svg { width: 20px; height: 20px; fill: #fff; }
-    .nav-right { display: flex; align-items: center; gap: 1rem; }
+    .nav-right { display: flex; align-items: center; gap: 1.2rem; }
+    .nav-links { display: flex; align-items: center; gap: 1.2rem; }
+    .nav-links a {
+      color: rgba(255,255,255,.85); text-decoration: none;
+      font-size: .88rem; font-weight: 500;
+      transition: color .15s;
+    }
+    .nav-links a:hover { color: #fff; }
+    .nav-links a.active { color: #fff; border-bottom: 2px solid rgba(255,255,255,.6); padding-bottom: 2px; }
     .nav-user { font-size: .85rem; color: rgba(255,255,255,.75); }
     .nav-user strong { color: #fff; }
     .worker-badge {
@@ -162,23 +170,38 @@
     .btn:hover  { background: #154888; }
     .btn:active { background: #0f3868; }
 
-    @media (max-width: 500px) {
+    @media (max-width: 640px) {
       .form-row  { grid-template-columns: 1fr; }
       .info-grid { grid-template-columns: 1fr; }
-      .nav-user  { display: none; }
+      .nav-links { display: none; }
+      .nav-right { gap: .6rem; }
     }
   </style>
+  <base target="_self">
 </head>
 <body>
 
 <nav>
-  <a class="nav-logo" href="#">
+  <a class="nav-logo" th:href="@{/}">
     <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M13 2L3 14h8l-1 8 11-12h-8z"/></svg>
     Warsha
   </a>
   <div class="nav-right">
+    <div class="nav-links">
+      <!-- Worker nav -->
+      <a th:if="${user.role.name() == 'WORKER'}" th:href="@{/worker/dashboard}">Dashboard</a>
+      <a th:if="${user.role.name() == 'WORKER'}" th:href="@{/appointments/worker}">Requests</a>
+      <a th:if="${user.role.name() == 'WORKER'}" th:href="@{/worker/earnings}">Earnings</a>
+      <!-- Customer nav -->
+      <a th:if="${user.role.name() == 'USER'}" th:href="@{/layout}">Home</a>
+      <a th:if="${user.role.name() == 'USER'}" th:href="@{/workers}">Find Workers</a>
+      <a th:if="${user.role.name() == 'USER'}" th:href="@{/appointments}">Appointments</a>
+      <a th:if="${user.role.name() == 'USER'}" th:href="@{/customer/payments}">Payments</a>
+      <!-- Common -->
+      <a th:href="@{/profile}" class="active">Profile</a>
+    </div>
     <span class="nav-user">
-      Signed in as <strong th:text="${user.username}">user</strong>
+      <strong th:text="${user.username}">user</strong>
     </span>
     <span class="worker-badge" th:if="${user.role.name() == 'WORKER'}">Worker</span>
     <form th:action="@{/logout}" method="post" style="display:inline;">
@@ -312,6 +335,13 @@
                 <option value="15" th:selected="${user.yearsExperience == 15}">More than 10 years</option>
               </select>
             </div>
+          </div>
+
+          <div class="form-group">
+            <label for="basePrice">Base price (EGP)</label>
+            <input id="basePrice" type="number" name="basePrice"
+                   step="0.01" min="0"
+                   th:value="${user.basePrice}" placeholder="e.g. 250.00"/>
           </div>
 
           <div class="form-group">

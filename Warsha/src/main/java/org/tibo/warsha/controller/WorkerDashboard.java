@@ -1,6 +1,5 @@
 package org.tibo.warsha.controller;
 
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Controller;
@@ -20,33 +19,33 @@ import java.util.List;
 
 @Controller
 @RequestMapping("/worker")
-@PreAuthorize("hasRole('WORKER')")
 public class WorkerDashboard {
+
     private final AppointmentService appointmentService;
     private final UserService userService;
-
 
     public WorkerDashboard(AppointmentService appointmentService, UserService userService) {
         this.appointmentService = appointmentService;
         this.userService = userService;
     }
+
     @GetMapping("/dashboard")
     public String workerDashboard(@AuthenticationPrincipal UserDetails principal, Model model) {
-        // Fetch authenticated worker
         User worker = userService.findByUsername(principal.getUsername())
                 .orElseThrow(() -> new IllegalStateException("Worker not found"));
 
-        // Dashboard metrics
+        if (worker.getRole() != User.Role.WORKER) {
+            return "redirect:/layout";
+        }
+
         long pendingCount = appointmentService.getPendingRequestsCount(worker);
         List<Appointment> todaysAppointments = appointmentService.getTodaysAppointments(worker);
         BigDecimal totalEarnings = worker.getTotalEarnings() != null
                 ? worker.getTotalEarnings()
                 : BigDecimal.ZERO;
 
-        // All appointments for reference (sorted by date)
         List<Appointment> allAppointments = appointmentService.findByWorker(worker);
 
-        // Add to Thymeleaf model
         model.addAttribute("worker", worker);
         model.addAttribute("pendingCount", pendingCount);
         model.addAttribute("todaysAppointments", todaysAppointments);
@@ -57,7 +56,7 @@ public class WorkerDashboard {
         return "worker/dashboard";
     }
 
-
+    // ── FIXED: Now calls confirmAppointment instead of rejectAppointment ──
     @PostMapping("/appointments/{id}/accept")
     public String acceptAppointment(@PathVariable Long id,
                                     @AuthenticationPrincipal UserDetails principal,
@@ -65,7 +64,7 @@ public class WorkerDashboard {
         User worker = getAuthenticatedWorker(principal);
 
         try {
-            appointmentService.rejectAppointment(id, worker.getId());
+            appointmentService.confirmAppointment(id, worker.getId()); // ✅ FIXED
             ra.addFlashAttribute("success", "Appointment accepted successfully.");
         } catch (IllegalArgumentException e) {
             ra.addFlashAttribute("error", e.getMessage());
@@ -73,7 +72,6 @@ public class WorkerDashboard {
 
         return "redirect:/worker/dashboard";
     }
-
 
     @PostMapping("/appointments/{id}/complete")
     public String completeAppointment(@PathVariable Long id,
@@ -91,7 +89,6 @@ public class WorkerDashboard {
         return "redirect:/worker/dashboard";
     }
 
-
     @GetMapping("/earnings")
     public String earningsHistory(@AuthenticationPrincipal UserDetails principal, Model model) {
         User worker = getAuthenticatedWorker(principal);
@@ -106,14 +103,15 @@ public class WorkerDashboard {
         model.addAttribute("totalEarnings", totalEarnings);
         model.addAttribute("completedCount", completedAppointments.size());
 
-        return "worker/earnings";
+        return "earnings";
     }
-
-
 
     private User getAuthenticatedWorker(UserDetails principal) {
-        return userService.findByUsername(principal.getUsername())
+        User user = userService.findByUsername(principal.getUsername())
                 .orElseThrow(() -> new IllegalStateException("Authenticated worker not found"));
+        if (user.getRole() != User.Role.WORKER) {
+            throw new IllegalStateException("Access denied: workers only");
+        }
+        return user;
     }
-
 }
