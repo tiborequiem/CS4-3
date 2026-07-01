@@ -67,7 +67,7 @@ public class AppointmentService {
                 .orElseThrow(() -> new IllegalArgumentException("Appointment not found."));
 
         if (!appointment.getCustomer().getId().equals(userId) &&
-                !appointment.getWorker().getId().equals(userId)) {
+            !appointment.getWorker().getId().equals(userId)) {
             throw new IllegalArgumentException("You are not authorized to cancel this appointment.");
         }
 
